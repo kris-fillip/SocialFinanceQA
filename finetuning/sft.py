@@ -14,6 +14,10 @@ import transformers
 from huggingface_hub import login
 from tqdm import tqdm
 
+from setup_data import remove_unused_columns, preprocess_sft, preprocess_sft_zephyr
+
+
+
 def chars_token_ratio(dataset, tokenizer, nb_examples=400):
     """
     Estimate the average number of characters per token in the dataset.
@@ -28,7 +32,7 @@ def chars_token_ratio(dataset, tokenizer, nb_examples=400):
 
     return total_characters / total_tokens
 
-def fine_tune(model_name, train_data, validation_data):
+def fine_tune(model_name: str, train_data: Dataset, validation_data: Dataset) -> None:
     print(f"using {len(train_data)} train samples and {len(validation_data)} validation samples")
     login()
     device_count = torch.cuda.device_count()
@@ -200,7 +204,7 @@ def fine_tune(model_name, train_data, validation_data):
     reloaded_tokenizer.save_pretrained(merged_dir)
 
 
-def remove_unused_columns(data: Dataset):
+def remove_unused_columns(data: Dataset) -> Dataset:
     all_columns = data.column_names
     columns_to_keep = ["text", "prompt", "chosen", "rejected"]
     for col in columns_to_keep:
@@ -210,31 +214,34 @@ def remove_unused_columns(data: Dataset):
     return data
 
 
-def preprocess_sft(example):
+def preprocess_sft(example: dict[any]) -> dict[any]:
     example["text"] = f"[INST] {example['text']} {example['context']} [/INST] {example['answer_1']}"
     return example
 
-def preprocess_sft_zephyr(example):
+def preprocess_sft_zephyr(example: dict[any]) -> dict[any]:
     example["text"] = f"<|system|>\n</s>\n<|user|>\n{example['text']} {example['context']}</s>\n<|assistant|>\n{example['answer_1']}</s>\n"
     return example
 
-def preprocess_dpo(example):
+def preprocess_dpo(example: dict[any]) -> dict[any]:
     example["prompt"] = f"[INST] {example['text']} {example['context']} [/INST]"
     example["chosen"] = example['answer_1']
     example["rejected"] = example['answer_2']
     return example
 
-def preprocess_dpo_zephyr(example):
+def preprocess_dpo_zephyr(example: dict[any]) -> dict[any]:
     example["prompt"] = f"<|system|>\n</s>\n<|user|>\n{example['text']} {example['context']}</s>\n",
     example["chosen"] = f"<|assistant|>\n{example['answer_1']}</s>\n",
     example["rejected"] = f"<|assistant|>\n{example['answer_2']}</s>\n",
     return example
 
-def sft(model_name: str) -> None:
+def sft(model_name: str, validation_size: int) -> None:
     data = load_dataset("Kris-Fillip/SocialFinanceQA", split="train")
-    updated_dataset = data.map(preprocess_sft)
+    if "zephyr" in model_name:
+        updated_dataset = data.map(preprocess_sft_zephyr)
+    else:
+        updated_dataset = data.map(preprocess_sft)
     updated_dataset = remove_unused_columns(updated_dataset)
-    train_validation = updated_dataset.train_test_split(test_size=1000, shuffle=False)
+    train_validation = updated_dataset.train_test_split(test_size=validation_size, shuffle=False)
     train = train_validation["train"]
     validation = train_validation["test"]
     fine_tune(model_name, train, validation)
@@ -244,5 +251,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("sft")
     parser.add_argument("-m", "--model_name", help="Model name to use as base model for the finetuning",
                         type=str, default="meta-llama/Llama-2-7b-hf")
+    parser.add_argument("-val", "--validation_size", help="Size of the validation dataset", type=int, default=1000)
     args = parser.parse_args()
-    sft(model_name=args.model_name)
+    sft(model_name=args.model_name, validation_size=args.validation_size)
