@@ -1,0 +1,48 @@
+name: wst_bert
+channels:
+  - conda-forge
+  - nvidia # nvidia channel for cuda packages
+  # We want to have a reproducible setup, so we don't want default channels,
+  # which may be different for different users. All required channels should
+  # be listed explicitly here.
+  - nodefaults
+dependencies:
+  - python=3.10
+  - pytorch::pytorch>=2.0
+  # CUDA only on linux and windows
+  - pytorch::pytorch-cuda=11.8 # [linux]
+  - pytorch::pytorch-cuda=11.8 # [win]
+  - dargparser
+  - wandb
+  - lightning
+  - transformers=4.37.1
+  - tokenizers
+  - datasets=2.16.1
+  - loguru
+  - tqdm
+  - accelerate=0.26.1
+  - evaluate=0.4.1
+  - bertopic
+  - flake8=3.9.2
+  - pre-commit=2.15.0
+  - pip=21.2.4
+  - setuptools~=67.7.2
+  - pandas~=2.0.2
+  - nltk~=3.8.1
+  - textblob~=0.15.3
+  - openai
+
+  # Dev dependencies
+  - black
+  - isort
+  - flake8
+
+  # pip dependencies
+  - pip
+  - pip:
+      - warmup-scheduler
+platforms:
+  - linux-64
+  # - osx-arm64 # This is for M1/M2 MacBooks
+  # - linux-aarch64 # This is linux-arm64. We can build Docker images for M1/M2 Macs on top of this - won't support MPS though
+  - win-64
